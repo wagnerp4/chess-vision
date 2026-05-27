@@ -1,0 +1,83 @@
+{
+  "model": "YOLO",
+  "weights": "/home/philipp/software/python/Vision/chess-vision/data/checkpoints/best/best_20260515_yolo_chess_pieces_2.pt",
+  "split": "val",
+  "mAP50": 0.9499197993499383,
+  "mAP50_95": 0.6642375288606224,
+  "precision": 0.9515694023484468,
+  "recall": 0.9280374627677489,
+  "eval_seconds": 4.22,
+  "status": "ok",
+  "per_class": {
+    "white-pawn": {
+      "mAP50": 0.9634880442494992,
+      "precision": 0.9592561544203534,
+      "recall": 0.9517562420651714
+    },
+    "white-rook": {
+      "mAP50": 0.9412698988923317,
+      "precision": 0.9525417719087428,
+      "recall": 0.9313984168865436
+    },
+    "white-knight": {
+      "mAP50": 0.943479111902861,
+      "precision": 0.9648716557398055,
+      "recall": 0.927775746498658
+    },
+    "white-bishop": {
+      "mAP50": 0.9569414473411474,
+      "precision": 0.953811648409196,
+      "recall": 0.9261844142781719
+    },
+    "white-queen": {
+      "mAP50": 0.9551813715361867,
+      "precision": 0.9594130989219165,
+      "recall": 0.9226638023630505
+    },
+    "white-king": {
+      "mAP50": 0.9511276009863335,
+      "precision": 0.9344593005643064,
+      "recall": 0.9379932356257046
+    },
+    "black-pawn": {
+      "mAP50": 0.9531903581126825,
+      "precision": 0.9707651742328414,
+      "recall": 0.9472722526755416
+    },
+    "black-rook": {
+      "mAP50": 0.934732232142825,
+      "precision": 0.9493785195407405,
+      "recall": 0.9128985580511294
+    },
+    "black-knight": {
+      "mAP50": 0.9625377686499373,
+      "precision": 0.9544297032661034,
+      "recall": 0.9321175278622087
+    },
+    "black-bishop": {
+      "mAP50": 0.95169787251313,
+      "precision": 0.9472966536373307,
+      "recall": 0.9181830984788024
+    },
+    "black-queen": {
+      "mAP50": 0.9450064243824926,
+      "precision": 0.9389370824461776,
+      "recall": 0.9194633379041506
+    },
+    "black-king": {
+      "mAP50": 0.9403854614898343,
+      "precision": 0.9336720650938484,
+      "recall": 0.9087429205238547
+    }
+  },
+  "metrics_raw": {
+    "metrics/precision(B)": 0.9515694023484468,
+    "metrics/recall(B)": 0.9280374627677489,
+    "metrics/mAP50(B)": 0.9499197993499383,
+    "metrics/mAP50-95(B)": 0.6642375288606224,
+    "fitness": 0.6642375288606224
+  },
+  "conf": null,
+  "iou_nms": 0.7,
+  "label": "best_20260515_yolo_chess_pieces_2 (YOLOv8n)"
+}

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import yaml
 
 SCHEMA_VERSION = 1
 BOARD_PX = 800
@@ -53,23 +52,6 @@ def board_metric_point(norm_x: float, norm_y: float, square_m: float) -> list[fl
         float(norm_y * 8.0 * square_m),
         0.0,
     ]
-
-
-def load_hand_eye(path: str | Path | None) -> dict[str, Any] | None:
-    if path is None:
-        return None
-    path = Path(path).expanduser().resolve()
-    if not path.is_file():
-        raise FileNotFoundError(str(path))
-    with open(path, "r") as f:
-        data = yaml.safe_load(f) or {}
-    square_m = float(data.get("square_m", 0.037))
-    out: dict[str, Any] = {"square_m": square_m}
-    if "T_tcp_board" in data:
-        out["T_tcp_board"] = np.asarray(data["T_tcp_board"], dtype=float).reshape(4, 4)
-    if "T_tcp_cam" in data:
-        out["T_tcp_cam"] = np.asarray(data["T_tcp_cam"], dtype=float).reshape(4, 4)
-    return out
 
 
 def apply_homogeneous(T: np.ndarray, p: np.ndarray) -> np.ndarray:

@@ -34,7 +34,7 @@ uv run python scripts/normalize_dataset.py --input data/roboflow/chess-pieces-2
 ```
 
 List presets and overrides: `uv run python scripts/download_roboflow.py --list-presets`  
-Presets live in [configs/roboflow_datasets.yaml](configs/roboflow_datasets.yaml).
+Presets live in [data/roboflow_presets.yaml](data/roboflow_presets.yaml).
 
 **Kaggle (legacy):** `uv run python scripts/download_dataset.py` (requires `~/.kaggle/kaggle.json`).
 
@@ -72,9 +72,9 @@ uv pip install torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu
 ```bash
 cd vision
 
-# Apple Silicon: set training.device: "mps" in configs/yolo.yaml and configs/rfdetr.yaml
-uv run python src/training/train_yolo.py --config configs/yolo.yaml
-uv run python src/training/train_rfdetr.py --config configs/rfdetr.yaml
+# Apple Silicon: set training.device: "mps" in configs/roboflow/yolo/yolo.yaml and configs/roboflow/rfdetr/rfdetr.yaml
+uv run python recipes/roboflow/finetune/yolo/main.py --config_dir configs/roboflow/yolo/yolo.yaml
+uv run python recipes/roboflow/finetune/rfdetr/main.py --config_dir configs/roboflow/rfdetr/rfdetr.yaml
 ```
 
 Resume from epoch 19 → 100 (use **`last.pt`**, not `best.pt`; same Roboflow dataset):
@@ -82,15 +82,15 @@ Resume from epoch 19 → 100 (use **`last.pt`**, not `best.pt`; same Roboflow da
 ```bash
 cd vision
 
-uv run python src/training/train_yolo.py --config configs/yolo.yaml \
+uv run python recipes/roboflow/finetune/yolo/main.py --config_dir configs/roboflow/yolo/yolo.yaml \
   --resume ../chess_detection/runs/detect/exps/yolo_chess_pieces_2/weights/last.pt
 ```
 
 Archived best weights (inference / OAK export): `data/checkpoints/best/best_20260515_yolo_chess_pieces_2.pt` (copy of run `best.pt`, best val fitness through epoch 18).
 
-Ultralytics writes runs under `../chess_detection/runs/detect/<project>/<name>/` when training is started from `vision/` (not under `vision/exps/`). On completion, `train_yolo.py` also copies to `data/checkpoints/best/best_YYYYMMDD_<run_name>.pt`.
+Ultralytics writes runs under `../chess_detection/runs/detect/<project>/<name>/` when training is started from `vision/` (not under `vision/exps/`). On completion, the YOLO recipe also copies to `data/checkpoints/best/best_YYYYMMDD_<run_name>.pt`.
 
-**MPS validation appearing stuck at 52/57:** same 910-image val split; 57 batches = in-train val uses ~2× train batch (8→16). The long pause is usually **post-val plotting** and MPS memory pressure, not a frozen dataloader. `configs/yolo.yaml` sets `plots: false` and `amp: false` for train and resume. Standalone `m.val(..., plots=False)` already finishes in ~16s on this machine.
+**MPS validation appearing stuck at 52/57:** same 910-image val split; 57 batches = in-train val uses ~2× train batch (8→16). The long pause is usually **post-val plotting** and MPS memory pressure, not a frozen dataloader. `configs/roboflow/yolo/yolo.yaml` sets `plots: false` and `amp: false` for train and resume. Standalone `m.val(..., plots=False)` already finishes in ~16s on this machine.
 
 ### Validation smoke (YOLO on Roboflow split)
 
@@ -112,7 +112,7 @@ m.val(
 "
 ```
 
-If MPS hangs, retry with `device='cpu'`. Expect **114** val batches at `batch=8` (910 images). In-training validation often shows **57** batches on the same split because Ultralytics uses a larger effective val batch (≈2× train `batch_size` from `configs/yolo.yaml`).
+If MPS hangs, retry with `device='cpu'`. Expect **114** val batches at `batch=8` (910 images). In-training validation often shows **57** batches on the same split because Ultralytics uses a larger effective val batch (≈2× train `batch_size` from `configs/roboflow/yolo/yolo.yaml`).
 
 Same metrics via the project script (writes JSON):
 
@@ -167,11 +167,11 @@ Live OAK-D pipeline (grid warp + YOLO) publishes **one JSON object per frame** o
 | `camera_uv` | via `board.corners_camera` | Four board corners in the 1280×720 image |
 | `board_uv` | via `squares[].u/v` | Warped 800×800 top-down board pixels |
 | `board_norm` | via `squares[].x/y`, `pieces[].center_norm` | 0–1 on the warped board (primary `frame` field) |
-| `board_metric` | only with `--hand-eye` | Meters on the board plane (`square_m`) |
-| `tcp` | only with `T_tcp_board` in hand-eye YAML | 3D points in robot TCP frame |
+| `board_metric` | only with `--robot` | Meters on the board plane (`square_m`) |
+| `tcp` | only with non-identity `T_tcp_board` in `src/robotics/hand_eye.py` | 3D points in robot TCP frame |
 | `camera_3d` / full `T_tcp_cam` | not yet | Needs depth or plane lift + hand-eye |
 
-Without `--hand-eye`, the stream is **2D board coordinates + square names** only. **TCP pose coordinates are not included** until calibration is added.
+Without `--robot`, the stream is **2D board coordinates + square names** only. **TCP pose coordinates are not included** until you set `T_tcp_board` in code.
 
 ### Commands
 
@@ -197,7 +197,7 @@ uv run python scripts/udp_streamer.py \
 
 uv run python scripts/udp_streamer.py --udp-host 127.0.0.1 --udp-port 9100 --show
 
-uv run python scripts/udp_streamer.py --hand-eye configs/hand_eye.example.yaml
+uv run python scripts/udp_streamer.py --robot
 ```
 
 Two-terminal UDP debug flow:
@@ -213,7 +213,7 @@ Terminal 2 - streamer:
 
 ```bash
 cd vision
-uv run python scripts/udp_streamer.py --hand-eye configs/hand_eye.example.yaml
+uv run python scripts/udp_streamer.py --robot
 ```
 
 Val-only smoke (no camera, no UDP) after training:
@@ -231,15 +231,15 @@ Resume interrupted YOLO training (use `last.pt`, not `best.pt`):
 
 ```bash
 cd vision
-uv run python src/training/train_yolo.py --config configs/yolo.yaml \
+uv run python recipes/roboflow/finetune/yolo/main.py --config_dir configs/roboflow/yolo/yolo.yaml \
   --resume ../chess_detection/runs/detect/exps/yolo_chess_pieces_2/weights/last.pt
 ```
 
 ### Notes
 
-- **In-training val vs standalone val:** same 910-image Roboflow `valid` split; progress bar may show **57** batches during `train_yolo.py` (~2× train batch) vs **114** for `m.val(..., batch=8)`. Different batch size, not a different dataset.
+- **In-training val vs standalone val:** same 910-image Roboflow `valid` split; progress bar may show **57** batches during YOLO training (~2× train batch) vs **114** for `m.val(..., batch=8)`. Different batch size, not a different dataset.
 - **MPS “stuck” near 52/57:** usually post-val **plotting** and GPU pressure; training config uses `plots: false` and `amp: false`. Standalone `m.val(..., plots=False)` is the isolation test.
-- **Hand-eye file:** copy `configs/hand_eye.example.yaml` and replace `T_tcp_board` with your measured transform before relying on `squares_tcp`.
+- **Hand-eye / robot framing:** defaults live in `src/robotics/hand_eye.py` (`DEFAULT_SQUARE_M`, `DEFAULT_T_TCP_BOARD`). Use `--robot` on the UDP streamer. Override `T_tcp_board` in code when you have a measured calibration.
 
 ---
 

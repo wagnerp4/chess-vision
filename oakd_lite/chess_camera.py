@@ -33,7 +33,7 @@ COLORS_12 = [
 def _vision_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
-
+# Move to: /home/philipp/software/python/Vision/chess-vision/src/training/checkpoints.py
 def find_blob_path(blob_path: str | Path | None) -> Path:
     if blob_path is not None:
         p = Path(blob_path)
@@ -90,7 +90,7 @@ def _get_tensor_from_nn_data(nn_data) -> np.ndarray:
         return np.asarray(t, dtype=np.float32)
     raise ValueError("NNData has no readable tensor")
 
-
+# Move to models
 def decode_yolo_output(
     nn_data,
     frame_shape: tuple,

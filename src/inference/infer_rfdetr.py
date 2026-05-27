@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import yaml
-import torch
+from src.models.backends.rfdetr import build_rfdetr
 
 
 def load_config(config_path: str) -> dict:
@@ -60,39 +60,7 @@ def infer_rfdetr(
     model_size: str = "base"
 ):
     """Run inference on image using RF-DETR model."""
-    try:
-        from rfdetr import (
-            RFDETRBase,
-            RFDETRLarge,
-            RFDETRMedium,
-            RFDETRNano,
-            RFDETRSmall
-        )
-    except ImportError:
-        raise ImportError(
-            "RF-DETR not installed. Please install: pip install rfdetr"
-        )
-    
-    model_map = {
-        "nano": RFDETRNano,
-        "small": RFDETRSmall,
-        "base": RFDETRBase,
-        "medium": RFDETRMedium,
-        "large": RFDETRLarge
-    }
-    
-    if model_size.lower() not in model_map:
-        raise ValueError(
-            f"Invalid model size: {model_size}. "
-            f"Must be one of: {list(model_map.keys())}"
-        )
-    
-    model_class = model_map[model_size.lower()]
-    model = model_class()
-    
-    if Path(model_path).exists():
-        model.get_model().load_state_dict(torch.load(model_path, map_location="cpu"))
-    
+    model = build_rfdetr(model_size, checkpoint=model_path)
     model.eval()
     
     image = cv2.imread(image_path)

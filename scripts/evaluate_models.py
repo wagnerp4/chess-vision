@@ -13,7 +13,7 @@ VISION_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(VISION_ROOT))
 
 from src.data.class_mapping import CANONICAL_CLASSES, load_roboflow_yaml, parse_names_block
-from src.utils.evaluation import evaluate_model_predictions
+from src.metrics import evaluate_model_predictions
 
 IMG_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -219,7 +219,7 @@ def evaluate_rfdetr_on_split(
         "num_images": metrics["num_images"],
         "eval_seconds": round(elapsed, 2),
         "status": "ok",
-        "note": "mAP50 via utils.evaluation (11-point); not identical to COCO mAP50-95",
+        "note": "mAP50 via src.metrics.tasks.obj_det (11-point); not identical to COCO mAP50-95",
     }
 
 

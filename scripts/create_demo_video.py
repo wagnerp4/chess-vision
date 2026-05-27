@@ -326,7 +326,10 @@ def create_demo_video(
             annotated_image = image.copy()
             print(f"  WARNING: No detections. The model may not be trained for chess pieces.")
             print(f"  Consider using a chess-specific model or training your own.")
-            print(f"  You can train a model using: python src/training/train_yolo.py --config configs/yolo_config.yaml")
+            print(
+                "  You can train a model using: "
+                "python recipes/roboflow/finetune/yolo/main.py --config_dir configs/roboflow/yolo/yolo.yaml"
+            )
         
         annotated_image = add_frame_info(annotated_image, idx, len(selected_images), num_detections)
         

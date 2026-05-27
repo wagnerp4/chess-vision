@@ -18,18 +18,18 @@ ENV/
 
 # Secrets and local config
 .env
-configs/hand_eye.yaml
 
-# Datasets (download via scripts)
-data/roboflow/
-data/processed/
-data/kaggle/
-data/runs/
-
-# Checkpoints (see data/checkpoints/README.md)
-data/checkpoints/pretrained/
-data/checkpoints/yolo/
-data/checkpoints/oak/*.onnx
+# Repo-root data tree (often large; see data/README.md)
+/data/*
+!data/README.md
+!data/roboflow_presets.yaml
+!data/checkpoints/
+!data/checkpoints/README.md
+!data/checkpoints/best/
+!data/checkpoints/best/**
+/data/checkpoints/pretrained/
+/data/checkpoints/yolo/
+/data/checkpoints/oak/
 
 # Generated outputs
 outputs/

@@ -2,13 +2,13 @@
 Live chess board stream over UDP (JSON datagrams).
 
 Runs the OAK-D grid + YOLO pipeline and publishes board/square/piece coordinates.
-Optional robot block (board_metric / tcp) when --hand-eye config is provided.
+Optional robot block (board_metric / tcp) when --robot is set (defaults in src/robotics/hand_eye.py).
 
 Usage:
     cd vision
     uv run python scripts/udp_streamer.py
     uv run python scripts/udp_streamer.py --udp-port 9100 --show
-    uv run python scripts/udp_streamer.py --hand-eye configs/hand_eye.example.yaml
+    uv run python scripts/udp_streamer.py --robot
 
 Listen (another terminal):
     nc -u -l 127.0.0.1 9100
@@ -27,8 +27,9 @@ VISION_ROOT = Path(__file__).resolve().parent.parent
 if str(VISION_ROOT) not in sys.path:
     sys.path.insert(0, str(VISION_ROOT))
 
-from src.board_stream import UdpPublisher, build_payload, load_hand_eye
+from src.board_stream import UdpPublisher, build_payload
 from src.live_pipeline import default_model, live_loop
+from src.robotics.hand_eye import resolve_hand_eye
 
 SCHEMA_VERSION = 1
 
@@ -46,13 +47,19 @@ def main() -> None:
         help="Show OpenCV windows (default: headless stream only)",
     )
     parser.add_argument(
-        "--hand-eye",
+        "--robot",
+        action="store_true",
+        help="Enable robot framing using defaults in src/robotics/hand_eye.py",
+    )
+    parser.add_argument(
+        "--square-m",
+        type=float,
         default=None,
-        help="YAML with square_m and optional T_tcp_board (4x4) for robot coordinates",
+        help="Override board square size in meters (requires --robot)",
     )
     args = parser.parse_args()
 
-    hand_eye = load_hand_eye(args.hand_eye)
+    hand_eye = resolve_hand_eye(enabled=args.robot, square_m=args.square_m)
     publisher = UdpPublisher(host=args.udp_host, port=args.udp_port)
     model_path = args.model or str(default_model())
     stop_event = threading.Event()
@@ -69,7 +76,7 @@ def main() -> None:
     if hand_eye:
         print(f"Robot framing enabled (square_m={hand_eye['square_m']})")
     else:
-        print("Robot block omitted (pass --hand-eye for board_metric / tcp)")
+        print("Robot block omitted (pass --robot for board_metric / tcp)")
     if not args.show:
         print("Headless mode. Press Ctrl+C to stop.")
 

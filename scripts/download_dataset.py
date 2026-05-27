@@ -1,66 +1,42 @@
-import os
 import argparse
+import sys
 from pathlib import Path
-import zipfile
 
-# TODO: extend download util
-# think about moving it to src long-term?
+VISION_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(VISION_ROOT))
 
-def download_kaggle_dataset(dataset_name: str, output_dir: str):
-    """Download dataset from Kaggle."""
-    try:
-        from kaggle.api.kaggle_api_extended import KaggleApi
-    except ImportError:
-        raise ImportError(
-            "Kaggle API not installed. Please install: pip install kaggle\n"
-            "Then set up your Kaggle API credentials: "
-            "https://www.kaggle.com/docs/api"
-        )
-    
-    api = KaggleApi()
-    api.authenticate()
-    
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    
-    print(f"Downloading dataset: {dataset_name}")
-    print(f"Output directory: {output_path}")
-    
-    api.dataset_download_files(
-        dataset_name,
-        path=str(output_path),
-        unzip=True
-    )
-    
-    print(f"Dataset downloaded successfully to {output_path}")
+from src.utils.download.kaggle import download_kaggle_dataset
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Download chess pieces dataset from Kaggle")
     parser.add_argument(
         "--dataset",
         type=str,
         default="ninadaithal/chess-pieces-dataset",
-        help="Kaggle dataset name (format: username/dataset-name)"
+        help="Kaggle dataset name (format: username/dataset-name)",
     )
     parser.add_argument(
         "--output",
         type=str,
-        default="data/raw",
-        help="Output directory for downloaded dataset"
+        default="data/kaggle",
+        help="Output directory for downloaded dataset",
     )
-    
     args = parser.parse_args()
-    
+
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = VISION_ROOT / output
+
     try:
-        download_kaggle_dataset(args.dataset, args.output)
+        download_kaggle_dataset(args.dataset, output)
     except Exception as e:
         print(f"Error downloading dataset: {e}")
         print("\nAlternative: Download manually from:")
         print(f"https://www.kaggle.com/datasets/{args.dataset}")
-        print(f"Then extract to: {args.output}")
+        print(f"Then extract to: {output}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-

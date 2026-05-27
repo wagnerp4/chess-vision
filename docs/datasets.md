@@ -78,7 +78,7 @@ uv run python scripts/download_roboflow.py --preset chess-full-aug
 uv run python scripts/normalize_dataset.py --input data/roboflow/chess-pieces-2
 ```
 
-Presets are defined in [configs/roboflow_datasets.yaml](../configs/roboflow_datasets.yaml). Override workspace/project/version if Roboflow changes slugs:
+Presets are defined in [data/roboflow_presets.yaml](../data/roboflow_presets.yaml). Override workspace/project/version if Roboflow changes slugs:
 
 ```bash
 uv run python scripts/download_roboflow.py --workspace fhv --project chess-pieces-2-6l8qq --version 1 --output data/roboflow/custom
@@ -95,8 +95,8 @@ Kaggle remains available via `scripts/download_dataset.py` (requires `~/.kaggle/
 1. `scripts/download_roboflow.py --preset chess-pieces-2` (and optionally `chess-full-aug`).
 2. `scripts/normalize_dataset.py` → canonical `white-pawn` … `black-king` under `data/processed/`.
 3. Map legacy Kaggle names if fine-tuning from `best_20260110_122310.pt` (`camel`→`bishop`, etc.; enabled by default in normalize).
-4. Train: `configs/yolo.yaml` and `configs/rfdetr.yaml` point at `data/processed/chess-pieces-2/`.
-5. `src/training/train_yolo.py` and `src/training/train_rfdetr.py`.
+4. Train: `configs/roboflow/yolo/yolo.yaml` and `configs/roboflow/rfdetr/rfdetr.yaml` point at `data/processed/chess-pieces-2/`.
+5. `recipes/roboflow/finetune/yolo/main.py` and `recipes/roboflow/finetune/rfdetr/main.py`.
 
 ### Benchmark (YOLO vs RF-DETR)
 
@@ -149,7 +149,7 @@ uv run python scripts/evaluate_models.py \
 
 ### YOLO (Ultralytics)
 
-- **Supported** in Ultralytics 8.x: set `device: "mps"` in `configs/yolo.yaml` or CLI `device=mps`.
+- **Supported** in Ultralytics 8.x: set `device: "mps"` in `configs/roboflow/yolo/yolo.yaml` or CLI `device=mps`.
 - Repo pin: `ultralytics>=8.0.0` (verified **8.4.50** loads YOLOv8–12 weights).
 - Expect **slower than CUDA**, faster than CPU; reduce `batch_size` (e.g. 8→4) if OOM.
 - If ops fail on MPS: `PYTORCH_ENABLE_MPS_FALLBACK=1` or fall back to `device: "cpu"`.
@@ -159,7 +159,7 @@ uv run python scripts/evaluate_models.py \
 
 - Roboflow docs list `device="mps"` for `model.train()` ([training parameters](https://rfdetr.roboflow.com/learn/train/training-parameters/)).
 - Use smaller variant (`nano`/`small`), lower `batch_size`, `gradient_checkpointing=True` on Mac.
-- `configs/rfdetr.yaml` currently only documents `cuda` / `cpu` — set `device: "mps"` when training on Mac.
+- `configs/roboflow/rfdetr/rfdetr.yaml` currently only documents `cuda` / `cpu` — set `device: "mps"` when training on Mac.
 
 ### OAK export
 
@@ -171,7 +171,7 @@ Training on MPS is fine; **blob conversion** still runs on host (ONNX → blobco
 
 | Version | In repo today | Ultralytics 8.4.50 | Notes |
 |---------|---------------|---------------------|-------|
-| YOLOv8n–x | **Yes** (`configs/yolo.yaml`, current checkpoint) | Yes | Best documented path; matches existing `.pt` / OAK scripts |
+| YOLOv8n–x | **Yes** (`configs/roboflow/yolo/yolo.yaml`, current checkpoint) | Yes | Best documented path; matches existing `.pt` / OAK scripts |
 | YOLOv9 | No default | Yes (`yolov9t.pt` …) | Drop-in via `model.name` in yaml |
 | YOLOv10 | No default | Yes | Drop-in |
 | YOLO11 | Referenced in README / `create_demo_video.py` | Yes | Good candidate for retrain |
@@ -181,7 +181,7 @@ Training on MPS is fine; **blob conversion** still runs on host (ONNX → blobco
 Change training model:
 
 ```yaml
-# configs/yolo.yaml
+# configs/roboflow/yolo/yolo.yaml
 model:
   name: "yolo11n"   # or yolov8s, yolov10n, yolo12n, etc.
 ```
