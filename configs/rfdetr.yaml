@@ -1,0 +1,40 @@
+# RF-DETR Configuration
+model:
+  name: "rfdetr"
+  size: "base"  # Options: "nano", "small", "base", "medium", "large"
+  pretrained: true
+  input_size: 640
+
+data:
+  dataset_path: "data/processed/chess-pieces-2"
+  train_split: 0.8
+  val_split: 0.15
+  test_split: 0.05
+  num_workers: 4
+  batch_size: 8  # Lower batch size for transformer models
+
+training:
+  epochs: 100
+  patience: 20
+  device: "cuda"  # cuda | cpu | mps (Apple Silicon)
+  save_dir: "models/rfdetr"
+  project: "exps"
+  name: "rfdetr_experiment"
+  
+  optimizer:
+    lr: 0.0001
+    weight_decay: 0.0001
+    warmup_epochs: 5
+    lr_scheduler: "cosine"
+
+  augmentation:
+    horizontal_flip: 0.5
+    color_jitter: 0.4
+    random_crop: true
+    resize_range: [480, 800]
+
+evaluation:
+  conf_threshold: 0.3
+  iou_threshold: 0.5
+  max_det: 100
+

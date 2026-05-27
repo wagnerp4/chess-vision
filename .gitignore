@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Secrets and local config
+.env
+configs/hand_eye.yaml
+
+# Datasets (download via scripts)
+data/roboflow/
+data/processed/
+data/kaggle/
+data/runs/
+
+# Checkpoints (see data/checkpoints/README.md)
+data/checkpoints/pretrained/
+data/checkpoints/yolo/
+data/checkpoints/oak/*.onnx
+
+# Generated outputs
+outputs/
+results/
+wandb/
+runs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Coverage / type checkers
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
