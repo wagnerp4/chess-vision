@@ -1,5 +1,7 @@
 # Chess-Vision Project
 
+Command reference (training, evaluation, inference, live OAK): **[docs/commands.md](docs/commands.md)**.
+
 ## Dataset install (Roboflow)
 
 Downloads are scripted via the Roboflow API (no browser after setup). Large archives stay under `data/roboflow/` and `data/processed/` (gitignored).

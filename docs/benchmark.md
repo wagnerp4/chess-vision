@@ -24,6 +24,7 @@ Results JSON: `results/benchmark/leaderboard.json` plus per-cell files under `re
 - `chess_pieces2_val` is the stable in-domain split (910 images).
 - `neuroTUM_test` uses pseudo-GT from Roboflow teacher labels (810 frames, domain shift).
 - Add a new detector: implement `DetectorBackend` under `src/evaluation/backends/` and register in `registry.py`.
+- **Live OAK benchmark:** see [commands.md](commands.md) §6 (`scripts/live_benchmark.py`, `scripts/chess_pipeline.py`).
 
 ## chess_pieces2_test (label_type=human)
 
