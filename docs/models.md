@@ -137,19 +137,19 @@ Reference: [Roboflow Universe — Chess Pieces](https://universe.roboflow.com/jo
 
 ---
 
-## Comparability — current gaps in repo
+## Comparability — unified benchmark (implemented)
 
-| Issue | YOLO path | RF-DETR path | Fix (planned) |
-|-------|-----------|--------------|---------------|
-| Metric engine | Ultralytics COCO `model.val()` | Custom 11-point AP per image (`src/metrics/tasks/obj_det`) | Single engine: COCO via `pycocotools` or Ultralytics for both |
-| mAP@50:95 | reported | `null` in JSON | same evaluator |
-| Precision / recall | reported | `null` | global P/R at fixed conf, or COCO-style |
-| conf threshold | 0.25 (eval script default) | 0.25 (forced in plan; config had 0.3) | one `evaluation.conf_threshold` in shared manifest |
-| IoU | 0.5 (script) vs 0.45 (yolo.yaml) | 0.5 | document `iou=0.5` for leaderboard; optional 0.5:0.95 |
-| Checkpoint eval | `.pt` path | size enum only, no fine-tuned ckpt | wire `build_rfdetr(size, checkpoint)` into eval |
-| Class names | from `dataset.yaml` | hardcoded `CANONICAL_CLASSES` | always from processed yaml |
+All detectors use the same pipeline: **predict on frozen split → dual metrics** (COCO via `pycocotools` + legacy 11-point AP). See `src/evaluation/`, `configs/benchmark.yaml`, and `docs/benchmark.md`.
 
-Existing entrypoint: `scripts/evaluate_models.py` → `results/evaluation.json`.
+| Component | Location |
+|-----------|----------|
+| Backend protocol | `src/evaluation/backends/base.py` |
+| Ultralytics / RF-DETR adapters | `src/evaluation/backends/` |
+| COCO + legacy scorers | `src/evaluation/coco_eval.py` |
+| Runner + manifest | `src/evaluation/runner.py`, `configs/benchmark.yaml` |
+| CLI | `scripts/evaluate_models.py --manifest configs/benchmark.yaml` |
+
+Existing entrypoint: `scripts/evaluate_models.py` → `results/benchmark/leaderboard.json`.
 
 ---
 

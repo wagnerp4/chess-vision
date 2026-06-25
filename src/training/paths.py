@@ -47,3 +47,10 @@ def resolve_device(requested: str) -> str:
         print("MPS not available, using CPU")
         return "cpu"
     return req
+
+
+def resolve_rfdetr_device(requested: str) -> str:
+    device = resolve_device(requested)
+    if device.isdigit():
+        return "cuda"
+    return device

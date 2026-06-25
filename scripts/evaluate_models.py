@@ -1,287 +1,250 @@
 import argparse
 import json
 import sys
-import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
-import cv2
-import numpy as np
-import yaml
 
 VISION_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(VISION_ROOT))
 
-from src.data.class_mapping import CANONICAL_CLASSES, load_roboflow_yaml, parse_names_block
-from src.metrics import evaluate_model_predictions
+from src.evaluation import (
+    IMG_EXTENSIONS,
+    EvalConfig,
+    ModelSpec,
+    BenchmarkScenario,
+    load_split_data,
+    load_yolo_detections,
+    resolve_dataset_yaml,
+    run_benchmark,
+    run_scenario,
+    save_results,
+    split_images_dir,
+    write_leaderboard_md,
+    yolo_labels_dir,
+    load_benchmark_manifest,
+)
+from src.evaluation.backends.rfdetr import predictions_from_supervision  # re-export for scripts
 
-IMG_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-
-
-def resolve_dataset_yaml(data_arg: str) -> Path:
-    path = Path(data_arg)
-    if not path.is_absolute():
-        path = VISION_ROOT / path
-    if path.is_dir():
-        for name in ("dataset.yaml", "data.yaml"):
-            candidate = path / name
-            if candidate.exists():
-                return candidate
-        raise FileNotFoundError(f"No dataset.yaml under {path}")
-    if not path.exists():
-        raise FileNotFoundError(f"Dataset path not found: {path}")
-    return path
-
-
-def split_images_dir(yaml_path: Path, split: str) -> Path:
-    data = load_roboflow_yaml(yaml_path)
-    root = yaml_path.parent
-    key = "val" if split == "valid" else split
-    rel = data.get(key) or data.get(split)
-    if rel is None:
-        raise KeyError(f"Split '{split}' not found in {yaml_path}")
-    images_dir = (root / rel).resolve()
-    if not images_dir.is_dir():
-        raise FileNotFoundError(f"Images directory missing: {images_dir}")
-    return images_dir
+def load_yolo_boxes(label_path, img_w, img_h, id_to_name):
+    dets = load_yolo_detections(label_path, img_w, img_h, id_to_name)
+    return [d.to_dict() for d in dets]
 
 
-def yolo_labels_dir(images_dir: Path) -> Path:
-    parts = list(images_dir.parts)
-    if parts[-1] == "images":
-        return Path(*parts[:-1]) / "labels"
-    return images_dir.parent / "labels"
-
-
-def load_yolo_boxes(
-    label_path: Path,
-    img_w: int,
-    img_h: int,
-    id_to_name: Dict[int, str],
-) -> List[dict]:
-    boxes: List[dict] = []
-    if not label_path.exists():
-        return boxes
-    with open(label_path, "r") as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) != 5:
-                continue
-            cid = int(parts[0])
-            xc, yc, w, h = map(float, parts[1:])
-            x1 = (xc - w / 2) * img_w
-            y1 = (yc - h / 2) * img_h
-            x2 = (xc + w / 2) * img_w
-            y2 = (yc + h / 2) * img_h
-            name = id_to_name.get(cid, f"class_{cid}")
-            boxes.append({
-                "class": name,
-                "bbox": [x1, y1, x2, y2],
-                "confidence": 1.0,
-            })
-    return boxes
-
-
-def load_ground_truth_split(
-    yaml_path: Path,
-    split: str = "test",
-) -> Dict[str, List[dict]]:
-    data = load_roboflow_yaml(yaml_path)
-    id_to_name = parse_names_block(data)
-    images_dir = split_images_dir(yaml_path, split)
-    labels_dir = yolo_labels_dir(images_dir)
-    ground_truth: Dict[str, List[dict]] = {}
-    for img_path in sorted(images_dir.iterdir()):
-        if img_path.suffix.lower() not in IMG_EXTENSIONS:
-            continue
-        img = cv2.imread(str(img_path))
-        if img is None:
-            continue
-        h, w = img.shape[:2]
-        label_path = labels_dir / f"{img_path.stem}.txt"
-        ground_truth[img_path.stem] = load_yolo_boxes(label_path, w, h, id_to_name)
-    return ground_truth
-
-
-def predictions_from_supervision(det, id_to_name: Dict[int, str]) -> List[dict]:
-    if det is None or len(det) == 0:
-        return []
-    xyxy = np.asarray(det.xyxy)
-    class_ids = np.asarray(det.class_id) if det.class_id is not None else np.zeros(len(det))
-    confidences = (
-        np.asarray(det.confidence)
-        if det.confidence is not None
-        else np.ones(len(det))
-    )
-    out: List[dict] = []
-    for i in range(len(det)):
-        cid = int(class_ids[i])
-        name = id_to_name.get(cid, f"class_{cid}")
-        out.append({
-            "class": name,
-            "bbox": xyxy[i].tolist(),
-            "confidence": float(confidences[i]),
-        })
-    return out
-
-
-def evaluate_yolo(
-    model_path: str,
-    yaml_path: Path,
-    split: str,
-    conf: float,
-    iou: float,
-) -> dict:
-    from ultralytics import YOLO
-
-    model = YOLO(model_path)
-    t0 = time.perf_counter()
-    metrics = model.val(
-        data=str(yaml_path),
-        split=split,
-        conf=conf,
-        iou=iou,
-        verbose=False,
-    )
-    elapsed = time.perf_counter() - t0
-    results = metrics.results_dict if hasattr(metrics, "results_dict") else {}
-    map50 = float(results.get("metrics/mAP50(B)", results.get("metrics/mAP50", 0.0)))
-    map5095 = float(
-        results.get("metrics/mAP50-95(B)", results.get("metrics/mAP50-95", 0.0))
-    )
-    precision = float(results.get("metrics/precision(B)", 0.0))
-    recall = float(results.get("metrics/recall(B)", 0.0))
+def load_ground_truth_split(yaml_path, split="test"):
+    split_data = load_split_data(yaml_path, split)
     return {
-        "model": "YOLO",
-        "weights": str(model_path),
-        "split": split,
-        "mAP50": map50,
-        "mAP50_95": map5095,
-        "precision": precision,
-        "recall": recall,
-        "eval_seconds": round(elapsed, 2),
-        "status": "ok",
+        stem: [d.to_dict() for d in dets]
+        for stem, dets in split_data.ground_truth.items()
     }
 
 
-def evaluate_rfdetr_on_split(
-    model_path: Optional[str],
-    model_size: str,
-    yaml_path: Path,
-    split: str,
-    conf: float,
-    iou: float,
-) -> dict:
-    from rfdetr import RFDETRBase, RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
-
-    size_map = {
-        "nano": RFDETRNano,
-        "small": RFDETRSmall,
-        "base": RFDETRBase,
-        "medium": RFDETRMedium,
-        "large": RFDETRLarge,
-    }
-    if model_path:
-        raise NotImplementedError(
-            "RF-DETR evaluation from custom checkpoint path is not wired yet; "
-            "use --rfdetr-size with a trained checkpoint via rfdetr.train output_dir."
-        )
-    model_cls = size_map.get(model_size.lower(), RFDETRBase)
-    model = model_cls()
-    id_to_name = {i: n for i, n in enumerate(CANONICAL_CLASSES)}
-    images_dir = split_images_dir(yaml_path, split)
-    labels_dir = yolo_labels_dir(images_dir)
-    predictions: Dict[str, List[dict]] = {}
-    ground_truth: Dict[str, List[dict]] = {}
-    t0 = time.perf_counter()
-    for img_path in sorted(images_dir.iterdir()):
-        if img_path.suffix.lower() not in IMG_EXTENSIONS:
-            continue
-        img = cv2.imread(str(img_path))
-        if img is None:
-            continue
-        h, w = img.shape[:2]
-        ground_truth[img_path.stem] = load_yolo_boxes(
-            labels_dir / f"{img_path.stem}.txt", w, h, id_to_name
-        )
-        det = model.predict(str(img_path), threshold=conf)
-        predictions[img_path.stem] = predictions_from_supervision(det, id_to_name)
-    metrics = evaluate_model_predictions(predictions, ground_truth, iou_threshold=iou)
-    elapsed = time.perf_counter() - t0
+def evaluate_rfdetr_on_split(model_path, model_size, yaml_path, split, conf, iou):
+    result = run_scenario(
+        ModelSpec(
+            id="rfdetr_adhoc",
+            backend="rfdetr",
+            weights=str(model_path) if model_path else "",
+            label=f"RF-DETR {model_size}",
+            size=model_size,
+        ),
+        BenchmarkScenario(
+            id=f"adhoc_{split}",
+            dataset_yaml=str(yaml_path),
+            split=split,
+        ),
+        EvalConfig(conf=conf, iou_match=iou),
+        root=VISION_ROOT,
+    )
+    d = result.to_dict()
     return {
         "model": "RF-DETR",
         "size": model_size,
         "split": split,
-        "mAP50": metrics["mAP"],
-        "mAP50_95": None,
-        "precision": None,
-        "recall": None,
-        "num_images": metrics["num_images"],
-        "eval_seconds": round(elapsed, 2),
-        "status": "ok",
-        "note": "mAP50 via src.metrics.tasks.obj_det (11-point); not identical to COCO mAP50-95",
+        "mAP50": result.metrics["legacy_ap"]["mAP50"],
+        "mAP50_95": result.metrics["coco"]["mAP50_95"],
+        "precision": result.metrics["coco"]["precision"],
+        "recall": result.metrics["coco"]["recall"],
+        "num_images": result.num_images,
+        "eval_seconds": result.eval_seconds,
+        "status": result.status,
+        "metrics": result.metrics,
+        "note": d["metrics"]["legacy_ap"].get("note"),
     }
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compare YOLO and RF-DETR on the same frozen dataset split"
+        description="Unified backend-agnostic detector benchmark"
+    )
+    parser.add_argument(
+        "--manifest",
+        type=str,
+        default=None,
+        help="Path to benchmark manifest YAML (runs full matrix)",
+    )
+    parser.add_argument("--model-id", type=str, default=None, help="Single model id from manifest")
+    parser.add_argument(
+        "--scenario-id",
+        type=str,
+        default=None,
+        help="Single scenario id from manifest",
     )
     parser.add_argument(
         "--data",
         type=str,
         default="data/processed/chess-pieces-2/dataset.yaml",
-        help="Path to dataset.yaml or processed dataset directory",
+        help="Dataset yaml for legacy one-off eval",
     )
-    parser.add_argument("--split", type=str, default="test", choices=["train", "val", "valid", "test"])
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        choices=["train", "val", "valid", "test"],
+    )
     parser.add_argument("--yolo-model", type=str, default=None, help="Path to YOLO .pt weights")
-    parser.add_argument("--rfdetr-size", type=str, default=None, choices=["nano", "small", "base", "medium", "large"])
-    parser.add_argument("--rfdetr-model", type=str, default=None, help="Reserved for future checkpoint loading")
+    parser.add_argument(
+        "--rfdetr-size",
+        type=str,
+        default=None,
+        choices=["nano", "small", "base", "medium", "large"],
+    )
+    parser.add_argument(
+        "--rfdetr-model",
+        type=str,
+        default=None,
+        help="Path to fine-tuned RF-DETR checkpoint (.ckpt or .pth)",
+    )
     parser.add_argument("--conf", type=float, default=0.25)
-    parser.add_argument("--iou", type=float, default=0.5)
+    parser.add_argument("--iou-match", type=float, default=0.5, dest="iou_match")
+    parser.add_argument("--iou-nms", type=float, default=0.45, dest="iou_nms")
+    parser.add_argument("--iou", type=float, default=None, help="Alias for --iou-match")
+    parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument(
         "--output",
         type=str,
-        default="results/evaluation.json",
-        help="JSON output path (relative to vision/)",
+        default="results/benchmark",
+        help="Output directory or JSON path",
+    )
+    parser.add_argument(
+        "--write-md",
+        type=str,
+        default="docs/benchmark.md",
+        help="Write markdown leaderboard table",
     )
     args = parser.parse_args()
 
-    yaml_path = resolve_dataset_yaml(args.data)
+    iou_match = args.iou if args.iou is not None else args.iou_match
+    eval_cfg = EvalConfig(
+        conf=args.conf,
+        iou_match=iou_match,
+        iou_nms=args.iou_nms,
+        imgsz=args.imgsz,
+    )
+
+    if args.manifest:
+        manifest_path = Path(args.manifest)
+        if not manifest_path.is_absolute():
+            manifest_path = VISION_ROOT / manifest_path
+        manifest = load_benchmark_manifest(manifest_path, root=VISION_ROOT)
+        model_ids = [args.model_id] if args.model_id else None
+        scenario_ids = [args.scenario_id] if args.scenario_id else None
+        results = run_benchmark(
+            manifest_path,
+            root=VISION_ROOT,
+            model_ids=model_ids,
+            scenario_ids=scenario_ids,
+        )
+        out_dir = Path(args.output)
+        if not out_dir.is_absolute():
+            out_dir = VISION_ROOT / out_dir
+        summary_path = save_results(results, out_dir, manifest_path, manifest)
+        md_path = Path(args.write_md)
+        if not md_path.is_absolute():
+            md_path = VISION_ROOT / md_path
+        write_leaderboard_md(results, md_path)
+        print(f"Leaderboard saved to {summary_path}")
+        print(f"Markdown table saved to {md_path}")
+        return
+
+    results = []
     split = "val" if args.split == "valid" else args.split
-    results: Dict[str, dict] = {
-        "dataset_yaml": str(yaml_path.resolve()),
-        "split": split,
-        "conf": args.conf,
-        "iou": args.iou,
-    }
+    yaml_path = resolve_dataset_yaml(args.data, root=VISION_ROOT)
+    scenario = BenchmarkScenario(
+        id=f"legacy_{split}",
+        dataset_yaml=str(yaml_path.relative_to(VISION_ROOT)),
+        split=split,
+    )
 
     if args.yolo_model:
         yolo_path = Path(args.yolo_model)
         if not yolo_path.is_absolute():
             yolo_path = VISION_ROOT / yolo_path
         print(f"Evaluating YOLO: {yolo_path}")
-        results["yolo"] = evaluate_yolo(str(yolo_path), yaml_path, split, args.conf, args.iou)
-        print(f"  mAP50={results['yolo']['mAP50']:.4f}  mAP50-95={results['yolo']['mAP50_95']:.4f}")
+        result = run_scenario(
+            ModelSpec(
+                id="yolo_adhoc",
+                backend="ultralytics",
+                weights=str(yolo_path),
+                label=str(yolo_path.name),
+            ),
+            scenario,
+            eval_cfg,
+            root=VISION_ROOT,
+        )
+        results.append(result)
+        print(
+            f"  COCO mAP50={result.metrics['coco']['mAP50']:.4f}  "
+            f"legacy mAP50={result.metrics['legacy_ap']['mAP50']:.4f}"
+        )
 
     if args.rfdetr_size or args.rfdetr_model:
-        size = args.rfdetr_size or "base"
+        size = args.rfdetr_size or "large"
+        weights = args.rfdetr_model or ""
         print(f"Evaluating RF-DETR ({size}) on split={split}")
-        results["rfdetr"] = evaluate_rfdetr_on_split(
-            args.rfdetr_model, size, yaml_path, split, args.conf, args.iou
+        result = run_scenario(
+            ModelSpec(
+                id="rfdetr_adhoc",
+                backend="rfdetr",
+                weights=weights,
+                label=f"RF-DETR {size}",
+                size=size,
+            ),
+            scenario,
+            eval_cfg,
+            root=VISION_ROOT,
         )
-        print(f"  mAP50={results['rfdetr']['mAP50']:.4f}  images={results['rfdetr']['num_images']}")
+        results.append(result)
+        print(
+            f"  COCO mAP50={result.metrics['coco']['mAP50']:.4f}  "
+            f"legacy mAP50={result.metrics['legacy_ap']['mAP50']:.4f}  "
+            f"images={result.num_images}"
+        )
 
-    if "yolo" not in results and "rfdetr" not in results:
-        parser.error("Provide at least one of --yolo-model or --rfdetr-size")
+    if not results:
+        parser.error(
+            "Provide --manifest or at least one of --yolo-model / --rfdetr-model"
+        )
 
     out_path = Path(args.output)
     if not out_path.is_absolute():
         out_path = VISION_ROOT / out_path
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"Results saved to {out_path}")
+    if out_path.suffix == ".json":
+        payload = {
+            "dataset_yaml": str(yaml_path.resolve()),
+            "split": split,
+            "eval_config": eval_cfg.__dict__,
+            "results": [r.to_dict() for r in results],
+        }
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "w") as f:
+            json.dump(payload, f, indent=2)
+        print(f"Results saved to {out_path}")
+    else:
+        out_path.mkdir(parents=True, exist_ok=True)
+        for result in results:
+            cell_path = out_path / f"{result.model['id']}_{result.scenario['id']}.json"
+            with open(cell_path, "w") as f:
+                json.dump(result.to_dict(), f, indent=2)
+            print(f"Results saved to {cell_path}")
 
 
 if __name__ == "__main__":

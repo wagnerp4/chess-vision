@@ -1,9 +1,9 @@
-# RF-DETR Configuration
+# RF-DETR Large fine-tune on Roboflow Chess Pieces 2
 model:
   name: "rfdetr"
-  size: "base"  # Options: "nano", "small", "base", "medium", "large"
+  size: "large"
   pretrained: true
-  input_size: 640
+  input_size: 704
 
 data:
   dataset_path: "data/processed/chess-pieces-2"
@@ -11,18 +11,24 @@ data:
   val_split: 0.15
   test_split: 0.05
   num_workers: 4
-  batch_size: 8  # Lower batch size for transformer models
+  batch_size: 2
+  grad_accum_steps: 8
 
 training:
   epochs: 100
   patience: 20
-  device: "cuda"  # cuda | cpu | mps (Apple Silicon)
-  save_dir: "models/rfdetr"
+  skip_best_epochs: 3
+  fast_dev_max_batches: 64
+  log_every_n_steps: 10
+  progress_bar: "tqdm"
+  device: "cuda"
+  save_dir: "data/checkpoints/rfdetr"
   project: "exps"
-  name: "rfdetr_experiment"
-  
+  name: "rfdetr_large_chess_pieces_2"
+
   optimizer:
     lr: 0.0001
+    lr_encoder: 0.00015
     weight_decay: 0.0001
     warmup_epochs: 5
     lr_scheduler: "cosine"
@@ -34,7 +40,12 @@ training:
     resize_range: [480, 800]
 
 evaluation:
-  conf_threshold: 0.3
+  conf_threshold: 0.25
   iou_threshold: 0.5
   max_det: 100
-
+  post_train:
+    - dataset_path: "data/processed/chess-pieces-2/dataset.yaml"
+      split: "val"
+    - dataset_path: "data/processed/neuroTUM-chess-dataset/dataset.yaml"
+      split: "test"
+      label: "neuroTUM_domain_shift"

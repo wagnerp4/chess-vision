@@ -13,6 +13,7 @@ from recipes.roboflow.finetune.setting import (
 )
 from recipes.roboflow.finetune.rfdetr.train import train_rfdetr
 from recipes.roboflow.finetune.yolo.train import resume_yolo, train_yolo
+from src.training.run_mode import parse_run_mode
 
 
 def parse_args():
@@ -42,6 +43,17 @@ def parse_args():
         default=None,
         help="YOLO only: path to last.pt (not best.pt)",
     )
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--fast-dev",
+        action="store_true",
+        help="RF-DETR only: 1 epoch, batch_size=1, val-only post-train eval",
+    )
+    mode_group.add_argument(
+        "--smoke",
+        action="store_true",
+        help="RF-DETR only: 1 epoch, production batch, full post-train eval",
+    )
     return parser.parse_args()
 
 
@@ -66,10 +78,19 @@ def main() -> None:
     else:
         if args.resume:
             raise ValueError("--resume is only supported for framework=yolo")
-        results = train_rfdetr(config, root)
+        if args.fast_dev or args.smoke:
+            run_mode = parse_run_mode(args)
+        else:
+            run_mode = "full"
+        results = train_rfdetr(config, root, run_mode=run_mode)
 
     print("Training completed!")
-    print(f"Results saved to: {results.save_dir}")
+    if args.framework == "yolo":
+        print(f"Results saved to: {results.save_dir}")
+    else:
+        print(f"Results saved to: {results.output_dir}")
+        if results.archived_checkpoint:
+            print(f"Archived checkpoint: {results.archived_checkpoint}")
 
 
 if __name__ == "__main__":

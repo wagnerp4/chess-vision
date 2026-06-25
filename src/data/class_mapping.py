@@ -147,8 +147,12 @@ def write_dataset_yaml(
     for idx, name in enumerate(CANONICAL_CLASSES):
         lines.append(f"  {idx}: {name}")
     lines.append("")
+    content = "\n".join(lines)
     with open(yaml_path, "w") as f:
-        f.write("\n".join(lines))
+        f.write(content)
+    data_yaml_path = output_root / "data.yaml"
+    with open(data_yaml_path, "w") as f:
+        f.write(content)
     return yaml_path
 
 

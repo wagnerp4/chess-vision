@@ -38,7 +38,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Chess board UDP stream (schema v1)")
     parser.add_argument("--model", default=None, help="YOLO .pt weights")
     parser.add_argument("--conf", type=float, default=0.1, help="YOLO confidence threshold")
-    parser.add_argument("--yolo-every", type=int, default=3, help="Run YOLO every N frames")
+    parser.add_argument("--yolo-every", type=int, default=None, help="Run piece detector every N frames")
+    parser.add_argument("--piece-every", type=int, default=None, help="Alias for --yolo-every")
     parser.add_argument("--udp-host", default="127.0.0.1", help="UDP destination host")
     parser.add_argument("--udp-port", type=int, default=9100, help="UDP destination port")
     parser.add_argument(

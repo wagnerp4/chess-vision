@@ -1,0 +1,38 @@
+eval:
+  conf: 0.25
+  iou_match: 0.5
+  iou_nms: 0.45
+  imgsz: 640
+  max_det: 300
+
+scenarios:
+  - id: chess_pieces2_test
+    dataset_yaml: data/processed/chess-pieces-2/dataset.yaml
+    split: test
+    label_type: human
+    label: "Chess Pieces 2 official test (16 images)"
+  - id: chess_pieces2_val
+    dataset_yaml: data/processed/chess-pieces-2/dataset.yaml
+    split: val
+    label_type: human
+    label: "Chess Pieces 2 val (910 images)"
+  - id: neuroTUM_test
+    dataset_yaml: data/processed/neuroTUM-chess-dataset/dataset.yaml
+    split: test
+    label_type: pseudo
+    label: "neuroTUM domain shift (810 frames, pseudo-GT)"
+
+models:
+  - id: yolov8n_cp2
+    backend: ultralytics
+    weights: data/checkpoints/best/best_20260515_yolo_chess_pieces_2.pt
+    label: "YOLOv8n chess-pieces-2"
+  - id: yolo26n_cp2
+    backend: ultralytics
+    weights: data/checkpoints/best/best_20260527_yolo26n_chess_pieces_2.pt
+    label: "YOLO26n chess-pieces-2"
+  - id: rfdetr_large_cp2
+    backend: rfdetr
+    weights: data/checkpoints/best/best_20260625_rfdetr.pt
+    size: large
+    label: "RF-DETR large"

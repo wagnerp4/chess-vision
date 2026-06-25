@@ -30,6 +30,8 @@ ENV/
 /data/checkpoints/pretrained/
 /data/checkpoints/yolo/
 /data/checkpoints/oak/
+/data/checkpoints/rfdetr/
+/data/checkpoints/best/best_*_rfdetr.pt
 
 # Generated outputs
 outputs/

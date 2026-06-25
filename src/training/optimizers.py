@@ -16,8 +16,13 @@ def yolo_optimizer_kwargs(optimizer_cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def rfdetr_optimizer_kwargs(optimizer_cfg: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "learning_rate": optimizer_cfg["lr"],
+    kwargs: dict[str, Any] = {
+        "lr": optimizer_cfg["lr"],
         "weight_decay": optimizer_cfg["weight_decay"],
         "warmup_epochs": optimizer_cfg["warmup_epochs"],
     }
+    if "lr_encoder" in optimizer_cfg:
+        kwargs["lr_encoder"] = optimizer_cfg["lr_encoder"]
+    if "lr_scheduler" in optimizer_cfg:
+        kwargs["lr_scheduler"] = optimizer_cfg["lr_scheduler"]
+    return kwargs
