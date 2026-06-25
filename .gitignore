@@ -27,11 +27,13 @@ ENV/
 !data/checkpoints/README.md
 !data/checkpoints/best/
 !data/checkpoints/best/**
+!data/test_videos/
 /data/checkpoints/pretrained/
 /data/checkpoints/yolo/
 /data/checkpoints/oak/
 /data/checkpoints/rfdetr/
 /data/checkpoints/best/best_*_rfdetr.pt
+
 
 # Generated outputs
 outputs/
